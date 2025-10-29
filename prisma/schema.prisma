@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model activity_feed {
+  id            String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id       String?      @db.Uuid
+  activity_type String
+  spot_id       String?      @db.Uuid
+  bounty_id     String?      @db.Uuid
+  submission_id String?      @db.Uuid
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  bounties      bounties?    @relation(fields: [bounty_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  spots         spots?       @relation(fields: [spot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  submissions   submissions? @relation(fields: [submission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users?       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_activity_created")
+  @@index([activity_type], map: "idx_activity_type")
+  @@index([user_id], map: "idx_activity_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bounties {
+  id                               String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  on_chain_id                      Int?            @unique
+  tx_hash                          String?
+  spot_id                          String?         @db.Uuid
+  creator_id                       String?         @db.Uuid
+  trick_name                       String
+  description                      String?
+  trick_difficulty                 Int?
+  reward_token                     String
+  reward_amount                    Decimal         @db.Decimal(18, 6)
+  reward_amount_usd                Decimal?        @db.Decimal(10, 2)
+  votes_required                   Int
+  is_active                        Boolean?        @default(true)
+  winner_id                        String?         @db.Uuid
+  winning_submission_id            String?         @db.Uuid
+  tags                             String[]        @default([])
+  created_at                       DateTime?       @default(now()) @db.Timestamptz(6)
+  completed_at                     DateTime?       @db.Timestamptz(6)
+  expires_at                       DateTime?       @db.Timestamptz(6)
+  activity_feed                    activity_feed[]
+  users_bounties_creator_idTousers users?          @relation("bounties_creator_idTousers", fields: [creator_id], references: [id], onUpdate: NoAction)
+  spots                            spots?          @relation(fields: [spot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_bounties_winner_idTousers  users?          @relation("bounties_winner_idTousers", fields: [winner_id], references: [id], onUpdate: NoAction)
+  submissions                      submissions[]
+
+  @@index([creator_id], map: "idx_bounties_creator")
+  @@index([on_chain_id], map: "idx_bounties_on_chain")
+  @@index([reward_amount(sort: Desc)], map: "idx_bounties_reward")
+  @@index([spot_id], map: "idx_bounties_spot")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model comments {
+  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id        String?      @db.Uuid
+  spot_id        String?      @db.Uuid
+  submission_id  String?      @db.Uuid
+  parent_id      String?      @db.Uuid
+  text           String
+  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?    @default(now()) @db.Timestamptz(6)
+  comments       comments?    @relation("commentsTocomments", fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other_comments comments[]   @relation("commentsTocomments")
+  spots          spots?       @relation(fields: [spot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  submissions    submissions? @relation(fields: [submission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users?       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([parent_id], map: "idx_comments_parent")
+  @@index([spot_id], map: "idx_comments_spot")
+  @@index([submission_id], map: "idx_comments_submission")
+  @@index([user_id], map: "idx_comments_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model followers {
+  follower_id                         String    @db.Uuid
+  following_id                        String    @db.Uuid
+  created_at                          DateTime? @default(now()) @db.Timestamptz(6)
+  users_followers_follower_idTousers  users     @relation("followers_follower_idTousers", fields: [follower_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_followers_following_idTousers users     @relation("followers_following_idTousers", fields: [following_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([follower_id, following_id])
+  @@index([follower_id], map: "idx_followers_follower")
+  @@index([following_id], map: "idx_followers_following")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notifications {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  type       String
+  title      String
+  message    String?
+  link_url   String?
+  is_read    Boolean?  @default(false)
+  metadata   Json?     @default("{}")
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_notifications_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model spots {
+  id                String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  creator_id        String?                  @db.Uuid
+  title             String
+  description       String?
+  location          Unsupported("geography")
+  latitude          Decimal                  @db.Decimal(10, 8)
+  longitude         Decimal                  @db.Decimal(11, 8)
+  address           String?
+  city              String?
+  country           String?
+  spot_type         String?
+  difficulty        Int?
+  surface_type      String?
+  accessibility     String?
+  photos            Json?                    @default("[]")
+  video_preview_url String?
+  views_count       Int?                     @default(0)
+  bounties_count    Int?                     @default(0)
+  submissions_count Int?                     @default(0)
+  is_active         Boolean?                 @default(true)
+  is_verified       Boolean?                 @default(false)
+  created_at        DateTime?                @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?                @default(now()) @db.Timestamptz(6)
+  activity_feed     activity_feed[]
+  bounties          bounties[]
+  comments          comments[]
+  users             users?                   @relation(fields: [creator_id], references: [id], onUpdate: NoAction)
+
+  @@index([city], map: "idx_spots_city")
+  @@index([created_at(sort: Desc)], map: "idx_spots_created_at")
+  @@index([creator_id], map: "idx_spots_creator")
+  @@index([difficulty], map: "idx_spots_difficulty")
+  @@index([location], map: "idx_spots_location", type: Gist)
+  @@index([spot_type], map: "idx_spots_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model submissions {
+  id                  String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  on_chain_id         Int?            @unique
+  tx_hash             String?
+  bounty_id           String?         @db.Uuid
+  skater_id           String?         @db.Uuid
+  video_url           String
+  video_thumbnail_url String?
+  video_duration      Int?
+  votes_up            Int?            @default(0)
+  votes_down          Int?            @default(0)
+  vote_score          Int?            @default(dbgenerated("(votes_up - votes_down)"))
+  status              String?         @default("pending")
+  is_rewarded         Boolean?        @default(false)
+  caption             String?
+  created_at          DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?       @default(now()) @db.Timestamptz(6)
+  activity_feed       activity_feed[]
+  comments            comments[]
+  bounties            bounties?       @relation(fields: [bounty_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users               users?          @relation(fields: [skater_id], references: [id], onUpdate: NoAction)
+  votes               votes[]
+
+  @@index([bounty_id], map: "idx_submissions_bounty")
+  @@index([created_at(sort: Desc)], map: "idx_submissions_created")
+  @@index([vote_score(sort: Desc)], map: "idx_submissions_score")
+  @@index([skater_id], map: "idx_submissions_skater")
+  @@index([status], map: "idx_submissions_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model trick_types {
+  id         Int     @id @default(autoincrement())
+  name       String  @unique
+  category   String?
+  difficulty Int?
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id                                      String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  wallet_address                          String          @unique
+  username                                String?         @unique
+  bio                                     String?
+  avatar_url                              String?
+  reputation_score                        Int?            @default(0)
+  total_spots_created                     Int?            @default(0)
+  total_bounties_created                  Int?            @default(0)
+  total_submissions                       Int?            @default(0)
+  total_earnings                          Decimal?        @default(0) @db.Decimal(18, 6)
+  created_at                              DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at                              DateTime?       @default(now()) @db.Timestamptz(6)
+  activity_feed                           activity_feed[]
+  bounties_bounties_creator_idTousers     bounties[]      @relation("bounties_creator_idTousers")
+  bounties_bounties_winner_idTousers      bounties[]      @relation("bounties_winner_idTousers")
+  comments                                comments[]
+  followers_followers_follower_idTousers  followers[]     @relation("followers_follower_idTousers")
+  followers_followers_following_idTousers followers[]     @relation("followers_following_idTousers")
+  notifications                           notifications[]
+  spots                                   spots[]
+  submissions                             submissions[]
+  votes                                   votes[]
+
+  @@index([reputation_score(sort: Desc)], map: "idx_users_reputation")
+  @@index([wallet_address], map: "idx_users_wallet")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model votes {
+  id            String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  submission_id String?      @db.Uuid
+  voter_id      String?      @db.Uuid
+  vote_value    Int
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  submissions   submissions? @relation(fields: [submission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users?       @relation(fields: [voter_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([submission_id, voter_id])
+  @@index([submission_id], map: "idx_votes_submission")
+  @@index([voter_id], map: "idx_votes_voter")
+}
